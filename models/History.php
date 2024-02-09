@@ -1,37 +1,35 @@
 <?php
 
 namespace app\models;
-
 use app\models\traits\ObjectNameTrait;
+use app\models\search\HistorySearch;
+use app\widgets\Export\Export;
+use yii\base\Widget;
+use yii\helpers\ArrayHelper;
+use yii\helpers\Url;
+
 use Yii;
-use yii\db\ActiveQuery;
-use yii\db\ActiveRecord;
 
 /**
- * This is the model class for table "{{%history}}".
+ * This is the model class for table "history".
  *
- * @property integer $id
+ * @property int $id
  * @property string $ins_ts
- * @property integer $customer_id
+ * @property int|null $customer_id
+ * @property int|null $user_id
  * @property string $event
- * @property string $object
- * @property integer $object_id
- * @property string $message
- * @property string $detail
- * @property integer $user_id
- *
- * @property string $eventText
+ * @property string|null $object
+ * @property int|null $object_id
+ * @property string|null $message
+ * @property string|null $detail
  *
  * @property Customer $customer
  * @property User $user
- *
- * @property Task $task
- * @property Sms $sms
- * @property Call $call
  */
-class History extends ActiveRecord
+class History extends \yii\db\ActiveRecord
 {
-    use ObjectNameTrait;
+
+   use ObjectNameTrait;
 
     const EVENT_CREATED_TASK = 'created_task';
     const EVENT_UPDATED_TASK = 'updated_task';
@@ -48,23 +46,23 @@ class History extends ActiveRecord
 
     const EVENT_CUSTOMER_CHANGE_TYPE = 'customer_change_type';
     const EVENT_CUSTOMER_CHANGE_QUALITY = 'customer_change_quality';
-
+    
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public static function tableName()
     {
-        return '{{%history}}';
+        return 'history';
     }
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public function rules()
     {
         return [
             [['ins_ts'], 'safe'],
-            [['customer_id', 'object_id', 'user_id'], 'integer'],
+            [['customer_id', 'user_id', 'object_id'], 'integer'],
             [['event'], 'required'],
             [['message', 'detail'], 'string'],
             [['event', 'object'], 'string', 'max' => 255],
@@ -74,25 +72,27 @@ class History extends ActiveRecord
     }
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public function attributeLabels()
     {
         return [
-            'id' => Yii::t('app', 'ID'),
-            'ins_ts' => Yii::t('app', 'Ins Ts'),
-            'customer_id' => Yii::t('app', 'Customer ID'),
-            'event' => Yii::t('app', 'Event'),
-            'object' => Yii::t('app', 'Object'),
-            'object_id' => Yii::t('app', 'Object ID'),
-            'message' => Yii::t('app', 'Message'),
-            'detail' => Yii::t('app', 'Detail'),
-            'user_id' => Yii::t('app', 'User ID'),
+            'id' => 'ID',
+            'ins_ts' => 'Ins Ts',
+            'customer_id' => 'Customer ID',
+            'user_id' => 'User ID',
+            'event' => 'Event',
+            'object' => 'Object',
+            'object_id' => 'Object ID',
+            'message' => 'Message',
+            'detail' => 'Detail',
         ];
     }
 
     /**
-     * @return ActiveQuery
+     * Gets query for [[Customer]].
+     *
+     * @return \yii\db\ActiveQuery
      */
     public function getCustomer()
     {
@@ -100,14 +100,16 @@ class History extends ActiveRecord
     }
 
     /**
-     * @return ActiveQuery
+     * Gets query for [[User]].
+     *
+     * @return \yii\db\ActiveQuery
      */
     public function getUser()
     {
         return $this->hasOne(User::class, ['id' => 'user_id']);
     }
 
-    /**
+      /**
      * @return array
      */
     public static function getEventTexts()
@@ -187,5 +189,31 @@ class History extends ActiveRecord
     {
         $detail = json_decode($this->detail);
         return isset($detail->data->{$attribute}) ? $detail->data->{$attribute} : null;
+    }
+
+
+    public function run()
+    {
+        $model = new HistorySearch();
+
+        return $this->render('main', [
+            'model' => $model,
+            'linkExport' => $this->getLinkExport(),
+            'dataProvider' => $model->search(Yii::$app->request->queryParams)
+        ]);
+    }
+
+    /**
+     * @return string
+     */
+    private function getLinkExport()
+    {
+        $params = Yii::$app->getRequest()->getQueryParams();
+        $params = ArrayHelper::merge([
+            'exportType' => Export::FORMAT_CSV
+        ], $params);
+        $params[0] = 'site/export';
+
+        return Url::to($params);
     }
 }
